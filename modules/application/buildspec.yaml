@@ -1,0 +1,56 @@
+version: 0.2
+
+env:
+  variables:
+    CLUSTER_NAME: "${var.cluster_name}"
+    ECR_REPO_URI: "${aws_ecr_repository.overlay_example.repository_url}"
+    APP_NAME: "overlay-example"
+phases:
+  install:
+    runtime-versions:
+      docker: 19
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --upgrade awscli
+      - echo "Installing Terraform..."
+      - wget https://releases.hashicorp.com/terraform/1.5.5/terraform_1.5.5_linux_amd64.zip
+      - unzip terraform_1.5.5_linux_amd64.zip
+      - mv terraform /usr/local/bin/
+  pre_build:
+    commands:
+      - cp src/node.Dockerfile $CODEBUILD_SRC_DIR_source_output/Dockerfile
+      - cp src/node.entrypoint.sh $CODEBUILD_SRC_DIR_source_output/entrypoint.sh
+      - cd $CODEBUILD_SRC_DIR_source_output
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
+  build:
+    commands:
+      - IMAGE_TAG=`date +%s`
+      - echo "Downloading .env file..."
+      - aws s3 cp s3://$S3_BUCKET/overlay.env .env
+      - echo "Building Docker image..."
+      - |
+        docker build -t $APP_NAME --build-arg DB_HOST=$DB_ENDPOINT \
+          --build-arg DB_PORT=$DB_PORT \
+          --build-arg DB_USER=$DB_USER \
+          --build-arg DB_PASSWORD=$DB_PASSWORD \
+          --build-arg DB_NAME=$DB_NAME .
+      - docker tag $APP_NAME:latest $ECR_REPO_URI:$IMAGE_TAG
+      - docker tag $APP_NAME:latest $ECR_REPO_URI:latest
+  post_build:
+    commands:
+      - echo "Pushing Docker image to ECR..."
+      - docker push $ECR_REPO_URI:latest
+      - docker push $ECR_REPO_URI:$IMAGE_TAG
+      - echo "Deploying to ECS using Terraform..."
+      - cd -
+      - aws s3 cp s3://$S3_BUCKET/dev.tfvars .
+      - ls -la
+      - sed -i "s/\"latest\"/\"${IMAGE_TAG}\"/" dev.tfvars
+      - cat dev.tfvars
+      - terraform init
+      - terraform apply -var-file="dev.tfvars" -auto-approve
+artifacts:
+  files:
+    - '**/*'
+  discard-paths: yes

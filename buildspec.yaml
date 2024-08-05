@@ -1,0 +1,37 @@
+version: 0.2
+
+env:
+  variables:
+    CLUSTER_NAME: "${var.cluster_name}"
+    ECR_REPO_URI: "${aws_ecr_repository.overlay_example.repository_url}"
+    APP_NAME: "overlay-example"
+phases:
+  install:
+    runtime-versions:
+      docker: 19
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --upgrade awscli
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
+  build:
+    commands:
+      - echo "Building Docker image..."
+      - docker build -t $APP_NAME .
+      - docker tag $APP_NAME:latest $ECR_REPO_URI:latest
+  post_build:
+    commands:
+      - echo "Pushing Docker image to ECR..."
+      - docker push $ECR_REPO_URI:latest
+      - echo "Downloading .env file..."
+      - aws s3 cp s3://overlay-bucket/overlay.env .env
+      - echo "Deploying to ECS using Terraform..."
+      - cd infra
+      - terraform init
+      - terraform apply -var="cluster_name=$CLUSTER_NAME" -var="image_url=$ECR_REPO_URI:latest" -auto-approve
+artifacts:
+  files:
+    - '**/*'
+  discard-paths: yes
