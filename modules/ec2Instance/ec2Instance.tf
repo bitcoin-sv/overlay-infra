@@ -1,26 +1,3 @@
-resource "aws_instance" "bastion" {
-  ami                         = var.ecs_image
-  instance_type               = var.ecs_instance_type
-  key_name                    = var.key_name
-  iam_instance_profile        = var.ec2_instance_profile_name
-  associate_public_ip_address = true
-
-  vpc_security_group_ids = [
-    var.bastion_sg_id,
-    var.internal_access_sg
-  ]
-
-  subnet_id = var.public_subnet_ids[0]
-
-  tags = {
-    Name = "${var.cluster_name} bastion"
-  }
-}
-
-resource "aws_eip" "bastion_eip" {
-  instance = aws_instance.bastion.id
-}
-
 resource "aws_launch_configuration" "ecs" {
   name                        = "ecs-launch-configuration-${substr(md5(timestamp()), 0, 8)}"
   image_id                    = var.ecs_image
