@@ -110,6 +110,20 @@ Set up a CodeStar Connection to allow CodePipeline to access the GitHub reposito
 connection.
 8. Note down the **Connection ARN**.
 
+### Generate a Key Pair in AWS EC2
+Create a key pair to access ec2 servers.
+
+1. Log in to the AWS Management Console.
+2. Navigate to EC2
+3. Access the Key Pairs Section
+4. Create a New Key Pair
+5. Specify Key Pair Details
+6. Enter a name for your key pair (e.g., test-babbage).
+7. Key Pair Type: Choose the type of key pair (RSA).
+8. Private Key File Format .pem
+9. Create Key Pair
+10. Store Your Key Pair Safely
+
 ## Tool Installation
 
 ### AWS CLI
@@ -253,6 +267,11 @@ terraform output lb_dns_name
 - **Type**: CNAME
 - **Value**: lb-dns-name (the value obtained by the terraform output lb_dns_name
 command)
+
+## Pipeline
+In order to change the backend.tf within the pipeline, you must commit it to the repository. This ensures that the build process uses the exact files and configurations stored in the version control system (VCS). The backend.tf file, responsible for defining the backend configuration for Terraform, is included in this process.
+
+The pipeline also tries to pull the .env from s3 and they look for a: aws s3 cp s3://$S3_BUCKET/overlay.env .env so, make sure you push the .env file with the right name. 
 
 ## Updates and Maintenance
 
